@@ -31,6 +31,7 @@ const (
 	defaultAzureSubnetPrefix    = "192.168.0.0/16"
 	defaultStorageType          = string(storage.StandardLRS)
 	defaultAzureAvailabilitySet = "docker-machine"
+	defaultIsAzureStack         = false
 )
 
 const (
@@ -60,6 +61,10 @@ const (
 	flAzureCustomData        = "azure-custom-data"
 	flAzureClientID          = "azure-client-id"
 	flAzureClientSecret      = "azure-client-secret"
+	flAzureStack             = "azure-stack"
+	flAzureStackAdEndpoint   = "azure-stack-ad-endpoint"
+	flAzureStackAdResource   = "azure-stack-ad-resource"
+	flAzureStackResoureURL   = "azure-stack-resource-manager-url"
 )
 
 const (
@@ -77,6 +82,11 @@ type Driver struct {
 	Environment    string
 	SubscriptionID string
 	ResourceGroup  string
+
+	AzureStack           bool
+	AzureStackAdEndpoint string
+	AzureStackAdResource string
+	AzureStackResoureURL string
 
 	DockerPort      int
 	Location        string
@@ -129,6 +139,26 @@ func (d *Driver) GetCreateFlags() []mcnflag.Flag {
 			Usage:  "Azure environment (e.g. AzurePublicCloud, AzureChinaCloud)",
 			EnvVar: "AZURE_ENVIRONMENT",
 			Value:  defaultAzureEnvironment,
+		},
+		mcnflag.BoolFlag{
+			Name:   flAzureStack,
+			Usage:  "Configures environment to target azure stack",
+			EnvVar: "IS_AZURE_STACK",
+		},
+		mcnflag.StringFlag{
+			Name:   flAzureStackAdEndpoint,
+			Usage:  "Azure Active Directory Endpoint",
+			EnvVar: "AZURE_AD_ENDPOINT",
+		},
+		mcnflag.StringFlag{
+			Name:   flAzureStackAdResource,
+			Usage:  "Azure Active Directory resource ID",
+			EnvVar: "AZURE_AD_RESOURCE",
+		},
+		mcnflag.StringFlag{
+			Name:   flAzureStackResoureURL,
+			Usage:  "Azure Stack Resource Manager URL (https://management.<region>.<fqdn>)",
+			EnvVar: "AZURE_STACK_RESOURCE_ENDPOINT",
 		},
 		mcnflag.StringFlag{
 			Name:   flAzureSubscriptionID,
@@ -312,6 +342,11 @@ func (d *Driver) SetConfigFromFlags(fl drivers.DriverOptions) error {
 	d.UpdateCount = fl.Int(flAzureUpdateDomainCount)
 	d.DiskSize = fl.Int(flAzureDiskSize)
 
+	d.AzureStack = fl.Bool(flAzureStack)
+	d.AzureStackAdEndpoint = fl.String(flAzureStackAdEndpoint)
+	d.AzureStackAdResource = fl.String(flAzureStackAdResource)
+	d.AzureStackResoureURL = fl.String(flAzureStackResoureURL)
+
 	d.ClientID = fl.String(flAzureClientID)
 	d.ClientSecret = fl.String(flAzureClientSecret)
 
@@ -331,6 +366,18 @@ func (d *Driver) PreCreateCheck() (err error) {
 	if d.CustomDataFile != "" {
 		if _, err := os.Stat(d.CustomDataFile); os.IsNotExist(err) {
 			return fmt.Errorf("custom-data file %s could not be found", d.CustomDataFile)
+		}
+	}
+
+	if d.AzureStack {
+		if d.AzureStackAdEndpoint == "" {
+			return fmt.Errorf("When using azure stack must set Ad Endpoint --azure-stack-ad-endpoint")
+		}
+		if d.AzureStackAdResource == "" {
+			return fmt.Errorf("When using azure stack must set Ad Resource --azure-stack-ad-resource")
+		}
+		if d.AzureStackResoureURL == "" {
+			return fmt.Errorf("When using azure stack must set Resource URL --azure-stack-resource-manager-url")
 		}
 	}
 
