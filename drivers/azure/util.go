@@ -39,7 +39,7 @@ func (r requiredOptionError) Error() string {
 // initiates authentication if required.
 func (d *Driver) newAzureClient() (*azureutil.AzureClient, error) {
 	env, ok := environments[d.Environment]
-	if !ok {
+	if !ok && !d.AzureStack {
 		valid := make([]string, 0, len(environments))
 		for k := range environments {
 			valid = append(valid, k)
