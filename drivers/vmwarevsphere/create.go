@@ -3,7 +3,6 @@ package vmwarevsphere
 import (
 	"fmt"
 	"path/filepath"
-	"strings"
 
 	"github.com/rancher/machine/libmachine/log"
 	"github.com/vmware/govmomi/find"
@@ -95,10 +94,11 @@ func (d *Driver) createLegacy() error {
 	}
 
 	spec := types.VirtualMachineConfigSpec{
-		Name:     d.MachineName,
-		GuestId:  "otherLinux64Guest",
-		NumCPUs:  int32(d.CPU),
-		MemoryMB: int64(d.Memory),
+		Name:       d.MachineName,
+		GuestId:    "otherLinux64Guest",
+		NumCPUs:    int32(d.CPU),
+		MemoryMB:   int64(d.Memory),
+		VAppConfig: d.getVAppConfig(),
 	}
 
 	scsi, err := object.SCSIControllerTypes().CreateSCSIController("pvscsi")
@@ -110,67 +110,6 @@ func (d *Driver) createLegacy() error {
 		Operation: types.VirtualDeviceConfigSpecOperationAdd,
 		Device:    scsi,
 	})
-
-	if d.VAppTransport == "com.vmware.guestInfo" ||
-		d.VAppTransport == "iso" {
-
-		vApp := types.VmConfigSpec{
-			OvfEnvironmentTransport: []string{d.VAppTransport},
-		}
-
-		if d.VAppIpAllocationPolicy == "dhcp" ||
-			d.VAppIpAllocationPolicy == "fixed" ||
-			d.VAppIpAllocationPolicy == "transient" ||
-			d.VAppIpAllocationPolicy == "fixedAllocated" {
-
-			if d.VAppIpProtocol != "IPv4" &&
-				d.VAppIpProtocol != "IPv6" {
-				d.VAppIpProtocol = "IPv4"
-			}
-
-			supportedAllocationScheme := "ovfenv"
-			if d.VAppIpAllocationPolicy == "dhcp" {
-				supportedAllocationScheme = "dhcp"
-			}
-
-			vApp.IpAssignment = &types.VAppIPAssignmentInfo{
-				SupportedIpProtocol:       []string{d.VAppIpProtocol},
-				SupportedAllocationScheme: []string{supportedAllocationScheme},
-				IpProtocol:                d.VAppIpProtocol,
-				IpAllocationPolicy:        d.VAppIpAllocationPolicy + "Policy",
-			}
-		}
-
-		for i, prop := range d.VAppProperties {
-			v := strings.SplitN(prop, "=", 2)
-			key := v[0]
-			typ := "string"
-			value := ""
-			if len(v) > 1 {
-				value = v[1]
-			}
-			if strings.HasPrefix(value, "ip:") {
-				typ = value
-				value = ""
-			} else if strings.HasPrefix(value, "${") &&
-				strings.HasSuffix(value, "}") {
-				typ = "expression"
-			}
-			vApp.Property = append(vApp.Property, types.VAppPropertySpec{
-				ArrayUpdateSpec: types.ArrayUpdateSpec{
-					Operation: types.ArrayUpdateOperationAdd,
-				},
-				Info: &types.VAppPropertyInfo{
-					Key:          int32(i),
-					Id:           key,
-					Type:         typ,
-					DefaultValue: value,
-				},
-			})
-		}
-
-		spec.VAppConfig = &vApp
-	}
 
 	folder, err := d.findFolder()
 	if err != nil {
@@ -264,15 +203,25 @@ func (d *Driver) createFromVmName() error {
 	}
 
 	var info *types.TaskInfo
-	ref := d.resourcepool.Reference()
+	var loc types.VirtualMachineRelocateSpec
+
+	if d.resourcepool != nil {
+		pool := d.resourcepool.Reference()
+		loc.Pool = &pool
+	}
+
+	if d.hostsystem != nil {
+		host := d.hostsystem.Reference()
+		loc.Host = &host
+	}
+
 	spec := types.VirtualMachineCloneSpec{
-		Location: types.VirtualMachineRelocateSpec{
-			Pool: &ref,
-		},
+		Location: loc,
 		Config: &types.VirtualMachineConfigSpec{
-			GuestId:  "otherLinux64Guest",
-			NumCPUs:  int32(d.CPU),
-			MemoryMB: int64(d.Memory),
+			GuestId:    "otherLinux64Guest",
+			NumCPUs:    int32(d.CPU),
+			MemoryMB:   int64(d.Memory),
+			VAppConfig: d.getVAppConfig(),
 		},
 	}
 
