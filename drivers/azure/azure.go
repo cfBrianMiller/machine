@@ -21,6 +21,7 @@ import (
 
 const (
 	defaultAzureEnvironment     = "AzurePublicCloud"
+	defaultAzureStackFileName   = ""
 	defaultAzureResourceGroup   = "docker-machine"
 	defaultAzureSize            = "Standard_D2_v2"
 	defaultAzureLocation        = "westus"
@@ -36,6 +37,7 @@ const (
 
 const (
 	flAzureEnvironment       = "azure-environment"
+	flAzureStackFileName     = "azure-stack-file-name"
 	flAzureSubscriptionID    = "azure-subscription-id"
 	flAzureResourceGroup     = "azure-resource-group"
 	flAzureSSHUser           = "azure-ssh-user"
@@ -75,9 +77,10 @@ type Driver struct {
 	ClientID     string // service principal account name
 	ClientSecret string // service principal account password
 
-	Environment    string
-	SubscriptionID string
-	ResourceGroup  string
+	AzureStackFileName string
+	Environment        string
+	SubscriptionID     string
+	ResourceGroup      string
 
 	DockerPort      int
 	Location        string
@@ -130,6 +133,12 @@ func (d *Driver) GetCreateFlags() []mcnflag.Flag {
 			Usage:  "Azure environment (e.g. AzurePublicCloud, AzureChinaCloud)",
 			EnvVar: "AZURE_ENVIRONMENT",
 			Value:  defaultAzureEnvironment,
+		},
+		mcnflag.StringFlag{
+			Name:   flAzureStackFileName,
+			Usage:  "File Name of Azure Stack Environment (e.g. ~./azure/stack.json)",
+			EnvVar: "AZURE_STACK_FILE",
+			Value:  defaultAzureStackFileName,
 		},
 		mcnflag.StringFlag{
 			Name:   flAzureSubscriptionID,
@@ -312,6 +321,7 @@ func (d *Driver) SetConfigFromFlags(fl drivers.DriverOptions) error {
 	d.FaultCount = fl.Int(flAzureFaultDomainCount)
 	d.UpdateCount = fl.Int(flAzureUpdateDomainCount)
 	d.DiskSize = fl.Int(flAzureDiskSize)
+	d.AzureStackFileName = fl.String(flAzureStackFileName)
 
 	d.ClientID = fl.String(flAzureClientID)
 	d.ClientSecret = fl.String(flAzureClientSecret)

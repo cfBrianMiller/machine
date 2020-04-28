@@ -19,11 +19,13 @@ import (
 )
 
 var (
-	supportedEnvironments = []string{
+	azureStackEnvironmentName = "AZURE_STACK"
+	supportedEnvironments     = []string{
 		azure.PublicCloud.Name,
 		azure.USGovernmentCloud.Name,
 		azure.ChinaCloud.Name,
 		azure.GermanCloud.Name,
+		azureStackEnvironmentName,
 	}
 )
 
@@ -35,10 +37,19 @@ func (r requiredOptionError) Error() string {
 	return fmt.Sprintf("%s driver requires the %q option.", driverName, string(r))
 }
 
+func (d *Driver) getAzureEnvironment() (azure.Environment, error) {
+	if d.Environment == azureStackEnvironmentName {
+		env, err := azure.EnvironmentFromFile(d.AzureStackFileName)
+		return env, err
+	}
+	env, err := azure.EnvironmentFromName(d.Environment)
+	return env, err
+}
+
 // newAzureClient creates an AzureClient helper from the Driver context and
 // initiates authentication if required.
 func (d *Driver) newAzureClient(ctx context.Context) (*azureutil.AzureClient, error) {
-	env, err := azure.EnvironmentFromName(d.Environment)
+	env, err := d.getAzureEnvironment()
 	if err != nil {
 		supportedValues := strings.Join(supportedEnvironments, ", ")
 		return nil, fmt.Errorf("Invalid Azure environment: %q, supported values: %s", d.Environment, supportedValues)
